@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup Time Estimator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 60%;
+            max-width: 800px;
+            text-align: center;
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .form-group span {
+            display: block;
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .result {
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Backup Time Estimator</h1>
+        <div class="form-group">
+            <label for="totalBackup">Total Backup (MB):</label>
+            <input type="number" id="totalBackup" placeholder="Enter total backup data in MB">
+            <span id="totalBackupConverted"></span>
+        </div>
+        <div class="form-group">
+            <label for="remainingBackup">Remaining Backup (MB):</label>
+            <input type="number" id="remainingBackup" placeholder="Enter remaining backup data in MB">
+            <span id="remainingBackupConverted"></span>
+        </div>
+        <div class="form-group">
+            <label for="uploadSpeed">Average Upload Speed (Mbps):</label>
+            <input type="number" id="uploadSpeed" placeholder="Enter average upload speed in Mbps">
+            <span id="uploadSpeedConverted"></span>
+        </div>
+        <div class="form-group">
+            <label for="uploadHours">Upload Hours per Day:</label>
+            <input type="number" id="uploadHours" placeholder="Enter upload hours per day">
+            <span id="uploadHoursPercent"></span>
+        </div>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updateEstimates);
+        });
+
+        function updateEstimates() {
+            const totalBackup = document.getElementById('totalBackup').value;
+            const remainingBackup = document.getElementById('remainingBackup').value;
+            const uploadSpeed = document.getElementById('uploadSpeed').value;
+            const uploadHours = document.getElementById('uploadHours').value;
+
+            if (totalBackup) {
+                document.getElementById('totalBackupConverted').textContent = `
+                    ${convertSize(totalBackup)} (${formatNumber(totalBackup)} MB)
+                `;
+            } else {
+                document.getElementById('totalBackupConverted').textContent = '';
+            }
+
+            if (remainingBackup) {
+                document.getElementById('remainingBackupConverted').textContent = `
+                    ${convertSize(remainingBackup)} (${formatNumber(remainingBackup)} MB)
+                `;
+            } else {
+                document.getElementById('remainingBackupConverted').textContent = '';
+            }
+
+            if (uploadSpeed) {
+                const uploadSpeedMBps = (uploadSpeed / 8).toFixed(2);
+                document.getElementById('uploadSpeedConverted').textContent = `
+                    ${uploadSpeedMBps} MBps (${uploadSpeed} Mbps)
+                `;
+            } else {
+                document.getElementById('uploadSpeedConverted').textContent = '';
+            }
+
+            if (uploadHours) {
+                const uploadHoursPercent = ((uploadHours / 24) * 100).toFixed(2);
+                document.getElementById('uploadHoursPercent').textContent = `
+                    ${uploadHoursPercent}% of the day
+                `;
+            } else {
+                document.getElementById('uploadHoursPercent').textContent = '';
+            }
+
+            if (totalBackup && remainingBackup && uploadSpeed && uploadHours) {
+                const dailyUploadCapacity = (uploadSpeed / 8) * uploadHours * 3600; // MB per day
+                const remainingHours = remainingBackup / (uploadSpeed / 8);
+                const remainingDays = remainingBackup / dailyUploadCapacity;
+
+                document.getElementById('result').innerHTML = `
+                    Estimated hours to complete backup: ${formatNumber(remainingHours.toFixed(2))} hours<br>
+                    Estimated days to complete backup: ${formatNumber(remainingDays.toFixed(2))} days
+                `;
+            } else {
+                document.getElementById('result').innerHTML = 'Please fill in all fields.';
+            }
+        }
+
+        function convertSize(sizeMB) {
+            const sizeGB = (sizeMB / 1024).toFixed(2);
+            const sizeTB = (sizeMB / (1024 * 1024)).toFixed(2);
+            return `${sizeGB} GB / ${sizeTB} TB`;
+        }
+
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+        }
+    </script>
+</body>
+</html>

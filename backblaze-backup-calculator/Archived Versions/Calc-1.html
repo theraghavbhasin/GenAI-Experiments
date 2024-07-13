@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup Time Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            width: 300px;
+            text-align: center;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .output {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Backup Time Calculator</h2>
+        <input type="number" id="totalData" placeholder="Total data to be backed up (MB)" oninput="calculateTime()">
+        <input type="number" id="remainingData" placeholder="Remaining data (MB)" oninput="calculateTime()">
+        <input type="number" id="speed" placeholder="Internet speed (Mbps)" oninput="calculateTime()">
+        <input type="number" id="hoursPerDay" placeholder="Hours laptop can stay on (hours)" oninput="calculateTime()">
+        <div class="output" id="output"></div>
+    </div>
+
+    <script>
+        function calculateTime() {
+            const totalData = parseFloat(document.getElementById('totalData').value);
+            const remainingData = parseFloat(document.getElementById('remainingData').value);
+            const speed = parseFloat(document.getElementById('speed').value);
+            const hoursPerDay = parseFloat(document.getElementById('hoursPerDay').value);
+
+            if (isNaN(totalData) || isNaN(remainingData) || isNaN(speed) || isNaN(hoursPerDay)) {
+                document.getElementById('output').innerHTML = 'Please fill in all fields with valid numbers.';
+                return;
+            }
+
+            const remainingDataInMb = remainingData * 8; // convert MB to megabits
+            const timeInSeconds = remainingDataInMb / speed;
+            const timeInHours = timeInSeconds / 3600;
+            const timeInDays = timeInHours / 24;
+            const adjustedDays = timeInHours / hoursPerDay;
+
+            document.getElementById('output').innerHTML = `
+                <p>Time to backup remaining data:</p>
+                <p><strong>${timeInHours.toFixed(2)} hours</strong></p>
+                <p><strong>${timeInDays.toFixed(2)} days</strong></p>
+                <p>Considering ${hoursPerDay} hours/day, it will take:</p>
+                <p><strong>${adjustedDays.toFixed(2)} days</strong></p>
+            `;
+        }
+    </script>
+</body>
+</html>

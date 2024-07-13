@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup Time Estimator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            max-width: 1000px;
+        }
+        .content {
+            display: flex;
+            justify-content: space-between;
+        }
+        .input-section, .output-section {
+            flex: 1;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .form-group span {
+            display: block;
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .result {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .chart-container {
+            margin-top: 30px;
+            text-align: center;
+        }
+        canvas {
+            width: 100% !important;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .log-container {
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <div class="input-section">
+                <h1>Backup Time Estimator</h1>
+                <div class="form-group">
+                    <label for="totalBackup">Total Backup (MB):</label>
+                    <input type="text" id="totalBackup" placeholder="Enter total backup data in MB">
+                    <span id="totalBackupConverted"></span>
+                </div>
+                <div class="form-group">
+                    <label for="remainingBackup">Remaining Backup (MB):</label>
+                    <input type="text" id="remainingBackup" placeholder="Enter remaining backup data in MB">
+                    <span id="remainingBackupConverted"></span>
+                </div>
+                <div class="form-group">
+                    <label for="uploadSpeed">Average Upload Speed (Mbps):</label>
+                    <input type="text" id="uploadSpeed" placeholder="Enter average upload speed in Mbps">
+                    <span id="uploadSpeedConverted"></span>
+                </div>
+                <div class="form-group">
+                    <label for="uploadHours">Upload Hours per Day:</label>
+                    <input type="text" id="uploadHours" placeholder="Enter upload hours per day">
+                    <span id="uploadHoursPercent"></span>
+                </div>
+                <button id="saveButton">Save Data</button>
+            </div>
+            <div class="output-section">
+                <div class="result" id="result"></div>
+                <div class="chart-container">
+                    <canvas id="backupChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="log-container">
+            <h2>Saved Logs</h2>
+            <table id="logTable">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Total Backup (MB)</th>
+                        <th>Remaining Backup (MB)</th>
+                        <th>Upload Speed (Mbps)</th>
+                        <th>Upload Hours per Day</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            displayLogs();
+        });
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updateEstimates);
+            input.addEventListener('blur', formatNumberInput);
+        });
+        document.getElementById('saveButton').addEventListener('click', saveData);
+
+        let backupChart;
+
+        function updateEstimates() {
+            const totalBackup = unformatNumber(document.getElementById('totalBackup').value);
+            const remainingBackup = unformatNumber(document.getElementById('remainingBackup').value);
+            const uploadSpeed = unformatNumber(document.getElementById('uploadSpeed').value);
+            const uploadHours = unformatNumber(document.getElementById('uploadHours').value);
+
+            if (totalBackup) {
+                document.getElementById('totalBackupConverted').textContent = `
+                    ${convertSize(totalBackup)} (${formatNumber(totalBackup)} MB)
+                `;
+            } else {
+                document.getElementById('totalBackupConverted').textContent = '';
+            }
+
+            if (remainingBackup) {
+                document.getElementById('remainingBackupConverted').textContent = `
+                    ${convertSize(remainingBackup)} (${formatNumber(remainingBackup)} MB)
+                `;
+            } else {
+                document.getElementById('remainingBackupConverted').textContent = '';
+            }
+
+            if (uploadSpeed) {
+                const uploadSpeedMBps = (uploadSpeed / 8).toFixed(2);
+                document.getElementById('uploadSpeedConverted').textContent = `
+                    ${uploadSpeedMBps} MBps (${formatNumber(uploadSpeed)} Mbps)
+                `;
+            } else {
+                document.getElementById('uploadSpeedConverted').textContent = '';
+            }
+
+            if (uploadHours) {
+                const uploadHoursPercent = ((uploadHours / 24) * 100).toFixed(2);
+                document.getElementById('uploadHoursPercent').textContent = `
+                    ${uploadHoursPercent}% of the day
+                `;
+            } else {
+                document.getElementById('uploadHoursPercent').textContent = '';
+            }
+
+            if (totalBackup && remainingBackup && uploadSpeed && uploadHours) {
+                const dailyUploadCapacity = (uploadSpeed / 8) * uploadHours * 3600; // MB per day
+                const remainingHours = remainingBackup / (uploadSpeed / 8);
+                const remainingDays = remainingBackup / dailyUploadCapacity;
+                const completedBackup = totalBackup - remainingBackup;
+
+                document.getElementById('result').innerHTML = `
+                    Estimated hours to complete backup: ${formatNumber(remainingHours.toFixed(2))} hours<br>
+                    Estimated days to complete backup: ${formatNumber(remainingDays.toFixed(2))} days
+                `;
+
+                renderChart(completedBackup, remainingBackup, totalBackup);
+            } else {
+                document.getElementById('result').innerHTML = 'Please fill in all fields.';
+                renderChart(0, 0, 0);
+            }
+        }
+
+        function convertSize(sizeMB) {
+            const sizeGB = (sizeMB / 1024).toFixed(2);
+            const sizeTB = (sizeMB / (1024 * 1024)).toFixed(2);
+            return `${sizeGB} GB / ${sizeTB} TB`;
+        }
+
+        function formatNumber(num) {
+            let x = num.toString().split('.');
+            let x1 = x[0];
+            let x2 = x.length > 1 ? '.' + x[1] : '';
+            let lastThree = x1.slice(-3);
+            let otherNumbers = x1.slice(0, -3);
+            if (otherNumbers != '') {
+                lastThree = ',' + lastThree;
+            }
+            x1 = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+            return x1 + x2;
+        }
+
+        function unformatNumber(str) {
+            return parseFloat(str.replace(/,/g, ''));
+        }
+
+        function formatNumberInput(event) {
+            const input = event.target;
+            const value = unformatNumber(input.value);
+            input.value = formatNumber(value);
+        }
+
+        function renderChart(completed, remaining, total) {
+            const ctx = document.getElementById('backupChart').getContext('2d');
+            const data = {
+                labels: [
+                    `Completed (${((completed / total) * 100).toFixed(2)}%)`,
+                    `Remaining (${((remaining / total) * 100).toFixed(2)}%)`
+                ],
+                datasets: [{
+                    data: [completed, remaining],
+                    backgroundColor: ['#A8D5BA', '#FFA8A8'],
+                }]
+            };
+
+            const config = {
+                type: 'pie',
+                data: data,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                    }
+                }
+            };
+
+            if (backupChart) {
+                backupChart.destroy();
+            }
+
+            backupChart = new Chart(ctx, config);
+        }
+
+        function saveData() {
+            const totalBackup = document.getElementById('totalBackup').value;
+            const remainingBackup = document.getElementById('remainingBackup').value;
+            const uploadSpeed = document.getElementById('uploadSpeed').value;
+            const uploadHours = document.getElementById('uploadHours').value;
+
+            const log = {
+                timestamp: new Date().toLocaleString(),
+                totalBackup: totalBackup,
+                remainingBackup: remainingBackup,
+                uploadSpeed: uploadSpeed,
+                uploadHours: uploadHours
+            };
+
+            let logs = JSON.parse(localStorage.getItem('logs')) || [];
+            logs.push(log);
+            localStorage.setItem('logs', JSON.stringify(logs));
+
+            localStorage.setItem('totalBackup', totalBackup);
+            localStorage.setItem('remainingBackup', remainingBackup);
+            localStorage.setItem('uploadSpeed', uploadSpeed);
+            localStorage.setItem('uploadHours', uploadHours);
+
+            alert('Data saved!');
+            displayLogs();
+        }
+
+        function loadData() {
+            const totalBackup = localStorage.getItem('totalBackup');
+            const remainingBackup = localStorage.getItem('remainingBackup');
+            const uploadSpeed = localStorage.getItem('uploadSpeed');
+            const uploadHours = localStorage.getItem('uploadHours');
+
+            if (totalBackup !== null) {
+                document.getElementById('totalBackup').value = totalBackup;
+            }
+            if (remainingBackup !== null) {
+                document.getElementById('remainingBackup').value = remainingBackup;
+            }
+            if (uploadSpeed !== null) {
+                document.getElementById('uploadSpeed').value = uploadSpeed;
+            }
+            if (uploadHours !== null) {
+                document.getElementById('uploadHours').value = uploadHours;
+            }
+
+            updateEstimates();
+        }
+
+        function displayLogs() {
+            const logs = JSON.parse(localStorage.getItem('logs')) || [];
+            const logTableBody = document.querySelector('#logTable tbody');
+            logTableBody.innerHTML = '';
+
+            logs.forEach(log => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${log.timestamp}</td>
+                    <td>${log.totalBackup}</td>
+                    <td>${log.remainingBackup}</td>
+                    <td>${log.uploadSpeed}</td>
+                    <td>${log.uploadHours}</td>
+                `;
+                logTableBody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>
